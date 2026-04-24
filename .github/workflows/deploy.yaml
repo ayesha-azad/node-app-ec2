@@ -13,6 +13,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install Dependencies 
+        run: npm install
+
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
