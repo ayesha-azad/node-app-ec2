@@ -34,4 +34,4 @@ jobs:
             pm2 delete node-app 2>/dev/null || true
             pm2 start server.js --name "node-app"
             pm2 save
-            echo "Done! Visit: http://${{ secrets.EC2_HOST }}"
+            echo "Deployed! Visit: http://${{ secrets.EC2_HOST }}:3000"
