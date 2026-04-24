@@ -21,15 +21,6 @@ jobs:
       
       - name: Install Dependencies
         run: npm install
-
-      - name: Create deployment package
-        run: |
-          tar -czf deploy.tar.gz \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='node_modules' \
-            --exclude='.gitignore' \
-            .
       
       - name: Copy files via SCP 
         uses: appleboy/scp-action@v0.1.7
