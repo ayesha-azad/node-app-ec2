@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌌 Cosmic Particles - Interactive Universe</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="cursor-glow" id="cursorGlow"></div>
+    
+    <canvas id="universe"></canvas>
+    
+    <div class="overlay">
+        <div class="title-container">
+            <h1 class="title">COSMIC VOID</h1>
+            <p class="subtitle">Interact with the universe</p>
+        </div>
+    </div>
+
+    <div class="particle-counter">
+        <span>✦ <span id="particleCount">0</span> particles</span>
+    </div>
+
+    <div class="interaction-hint">✦ MOVE · CLICK · EXPLORE ✦</div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <span>⚡ FPS</span>
+            <span class="stat-value" id="fps">60</span>
+        </div>
+        <div class="stat-item">
+            <span>🌌 Nebulae</span>
+            <span class="stat-value" id="nebulaCount">3</span>
+        </div>
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('universe');
+        const ctx = canvas.getContext('2d');
+        let animationId;
+        let particles = [];
+        let nebulae = [];
+        let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        let time = 0;
+        let lastTime = performance.now();
+        let fps = 60;
+        let frameCount = 0;
+        let lastFpsUpdate = 0;
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Color palettes
+        const palettes = [
+            ['#6366f1', '#8b5cf6', '#a855f7', '#3b82f6', '#06b6d4'],
+            ['#ec4899', '#f43f5e', '#fb7185', '#e11d48', '#be123c'],
+            ['#10b981', '#34d399', '#6ee7b7', '#059669', '#047857'],
+            ['#f59e0b', '#fbbf24', '#fcd34d', '#d97706', '#b45309'],
+        ];
+
+        // Particle class
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                // Spawn in a sphere pattern
+                const angle1 = Math.random() * Math.PI * 2;
+                const angle2 = Math.acos(2 * Math.random() - 1);
+                const radius = 50 + Math.random() * 300;
+                
+                this.x = Math.cos(angle1) * Math.sin(angle2) * radius;
+                this.y = Math.sin(angle1) * Math.sin(angle2) * radius;
+                this.z = Math.cos(angle2) * radius;
+                
+                this.originalX = this.x;
+                this.originalY = this.y;
+                this.originalZ = this.z;
+                
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.vz = (Math.random() - 0.5) * 0.3;
+                
+                this.size = Math.random() * 2.5 + 0.5;
+                this.baseSize = this.size;
+                this.color = palettes[Math.floor(Math.random() * palettes.length)];
+                this.colorIndex = Math.floor(Math.random() * this.color.length);
+                this.opacity = Math.random() * 0.8 + 0.2;
+                this.twinkleSpeed = Math.random() * 0.03 + 0.01;
+                this.twinkleOffset = Math.random() * Math.PI * 2;
+                this.orbitSpeed = Math.random() * 0.002 + 0.0005;
+                this.orbitRadius = Math.random() * 0.5 + 0.5;
+                this.angle = Math.random() * Math.PI * 2;
+                this.angleY = Math.random() * Math.PI * 2;
+            }
+
+            update(time, mouseX, mouseY) {
+                // Orbital motion
+                this.angle += this.orbitSpeed;
+                this.angleY += this.orbitSpeed * 0.7;
+                
+                // Mouse interaction - attraction
+                const dx = mouseX - this.x;
+                const dy = mouseY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 200) {
+                    const force = (200 - dist) / 200;
+                    this.x += dx * force * 0.03;
+                    this.y += dy * force * 0.03;
+                }
+                
+                // Return to original position slowly
+                this.x += (this.originalX - this.x) * 0.002;
+                this.y += (this.originalY - this.y) * 0.002;
+                this.z += (this.originalZ - this.z) * 0.002;
+                
+                // Add subtle movement
+                this.x += Math.sin(time * 0.001 + this.twinkleOffset) * 0.3;
+                this.y += Math.cos(time * 0.0015 + this.twinkleOffset) * 0.3;
+                this.z += Math.sin(time * 0.0008 + this.twinkleOffset) * 0.3;
+                
+                // Twinkling size
+                this.size = this.baseSize + Math.sin(time * this.twinkleSpeed + this.twinkleOffset) * 0.5;
+                
+                // Opacity pulsing
+                this.opacity = 0.4 + Math.sin(time * this.twinkleSpeed * 2 + this.twinkleOffset) * 0.4;
+            }
+
+            draw(ctx, centerX, centerY) {
+                // 3D projection
+                const scale = 400 / (400 + this.z);
+                const x2d = centerX + this.x * scale;
+                const y2d = centerY + this.y * scale;
+                
+                // Don't draw if off screen
+                if (x2d < -50 || x2d > canvas.width + 50 || y2d < -50 || y2d > canvas.height + 50) return;
+                
+                const color = this.color[this.colorIndex];
+                ctx.save();
+                ctx.globalAlpha = this.opacity * Math.min(1, scale * 2);
+                
+                // Glow effect
+                const gradient = ctx.createRadialGradient(x2d, y2d, 0, x2d, y2d, this.size * 4);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(0.3, color + '99');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x2d, y2d, this.size * 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Core particle
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(x2d, y2d, this.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        // Nebula class
+        class Nebula {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = (Math.random() - 0.5) * canvas.width * 2;
+                this.y = (Math.random() - 0.5) * canvas.height * 2;
+                this.size = Math.random() * 200 + 100;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.001;
+                this.color1 = palettes[Math.floor(Math.random() * palettes.length)][0];
+                this.color2 = palettes[Math.floor(Math.random() * palettes.length)][2];
+                this.opacity = Math.random() * 0.03 + 0.02;
+                this.driftX = (Math.random() - 0.5) * 0.5;
+                this.driftY = (Math.random() - 0.5) * 0.5;
+            }
+
+            update() {
+                this.rotation += this.rotationSpeed;
+                this.x += this.driftX;
+                this.y += this.driftY;
+                
+                // Wrap around screen
+                if (this.x > canvas.width + this.size) this.x = -this.size;
+                if (this.x < -this.size) this.x = canvas.width + this.size;
+                if (this.y > canvas.height + this.size) this.y = -this.size;
+                if (this.y < -this.size) this.y = canvas.height + this.size;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size);
+                gradient.addColorStop(0, this.color1);
+                gradient.addColorStop(0.5, this.color2 + '66');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = gradient;
+                ctx.fillRect(-this.size, -this.size, this.size * 2, this.size * 2);
+                
+                ctx.restore();
+            }
+        }
+
+        // Initialize particles
+        function initParticles(count) {
+            particles = [];
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle());
+            }
+            document.getElementById('particleCount').textContent = count;
+        }
+
+        // Initialize nebulae
+        function initNebulae(count) {
+            nebulae = [];
+            for (let i = 0; i < count; i++) {
+                nebulae.push(new Nebula());
+            }
+            document.getElementById('nebulaCount').textContent = count;
+        }
+
+        // Initialize everything
+        initParticles(800);
+        initNebulae(5);
+
+        // Mouse tracking
+        let mouseCanvasX = canvas.width / 2;
+        let mouseCanvasY = canvas.height / 2;
+        let smoothMouseX = mouseCanvasX;
+        let smoothMouseY = mouseCanvasY;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseCanvasX = e.clientX;
+            mouseCanvasY = e.clientY;
+            
+            // Update cursor glow
+            const glow = document.getElementById('cursorGlow');
+            glow.style.left = e.clientX + 'px';
+            glow.style.top = e.clientY + 'px';
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            mouseCanvasX = e.touches[0].clientX;
+            mouseCanvasY = e.touches[0].clientY;
+        }, { passive: false });
+
+        // Click to add particles
+        document.addEventListener('click', (e) => {
+            // Create burst of particles at click location
+            for (let i = 0; i < 50; i++) {
+                const particle = new Particle();
+                particle.x = e.clientX - canvas.width / 2;
+                particle.y = e.clientY - canvas.height / 2;
+                particle.z = Math.random() * 50;
+                particle.originalX = particle.x;
+                particle.originalY = particle.y;
+                particle.originalZ = particle.z;
+                particle.vx = (Math.random() - 0.5) * 5;
+                particle.vy = (Math.random() - 0.5) * 5;
+                particle.vz = (Math.random() - 0.5) * 5;
+                particles.push(particle);
+            }
+            
+            // Update particle count display
+            document.getElementById('particleCount').textContent = particles.length;
+            
+            // Limit total particles
+            if (particles.length > 2000) {
+                particles.splice(0, 100);
+            }
+        });
+
+        // Animation loop
+        function animate(currentTime) {
+            animationId = requestAnimationFrame(animate);
+            
+            // FPS calculation
+            if (currentTime - lastFpsUpdate >= 1000) {
+                fps = Math.round((frameCount * 1000) / (currentTime - lastFpsUpdate));
+                document.getElementById('fps').textContent = fps;
+                frameCount = 0;
+                lastFpsUpdate = currentTime;
+            }
+            frameCount++;
+            
+            time = currentTime;
+            
+            // Smooth mouse movement
+            smoothMouseX += (mouseCanvasX - smoothMouseX) * 0.1;
+            smoothMouseY += (mouseCanvasY - smoothMouseY) * 0.1;
+            
+            // Clear canvas with fade effect for trails
+            ctx.fillStyle = 'rgba(13, 0, 26, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Draw nebulae
+            nebulae.forEach(nebula => {
+                nebula.update();
+                nebula.draw(ctx);
+            });
+            
+            // Draw particles
+            particles.forEach(particle => {
+                particle.update(time, smoothMouseX - centerX, smoothMouseY - centerY);
+                particle.draw(ctx, centerX, centerY);
+            });
+            
+            // Draw central glow
+            const centerGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 100);
+            centerGlow.addColorStop(0, 'rgba(139, 92, 246, 0.05)');
+            centerGlow.addColorStop(0.5, 'rgba(139, 92, 246, 0.02)');
+            centerGlow.addColorStop(1, 'transparent');
+            ctx.fillStyle = centerGlow;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Start animation
+        lastFpsUpdate = performance.now();
+        animate(performance.now());
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            // Reset nebulae positions
+            nebulae.forEach(nebula => nebula.reset());
+        });
+
+        // Auto cleanup old particles
+        setInterval(() => {
+            if (particles.length > 1000) {
+                particles.splice(0, 50);
+                document.getElementById('particleCount').textContent = particles.length;
+            }
+        }, 5000);
+
+        console.log('🌌 Cosmic Void initialized!');
+        console.log('✨ Click anywhere to create particle bursts!');
+        console.log('🖱️ Move your mouse to attract particles');
+    </script>
+</body>
+</html>
