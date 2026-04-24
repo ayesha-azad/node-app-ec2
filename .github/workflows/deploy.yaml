@@ -30,10 +30,19 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             cd /var/www/node-app
+            
+            # Stop Apache to free port 80
             sudo systemctl stop httpd 2>/dev/null || true
+            
+            # Install dependencies
             rm -rf node_modules
-            npm install
+            npm install --production
+            
+            # Stop old app
             pm2 delete node-app 2>/dev/null || true
+            
+            # Start app on port 80 (needs sudo)
             pm2 start server.js --name "node-app"
             pm2 save
-            echo "Done. Visit: http://$(curl -s ifconfig.me)"
+            
+            echo "✅ Deployed! Visit: http://${{ secrets.EC2_HOST }}"
