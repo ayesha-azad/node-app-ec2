@@ -28,6 +28,7 @@ jobs:
             --exclude='.github' \
             --exclude='node_modules' \
             --exclude='.gitignore' \
+            .
       
       - name: Copy files via SCP 
         uses: appleboy/scp-action@v0.1.7
