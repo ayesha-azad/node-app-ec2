@@ -15,4 +15,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`✨ Particle Universe is running on http://localhost:${PORT}`);
     console.log(`🚀 Open your browser and visit http://localhost:${PORT}`);
+    console.log("Made by A Azad!")
 });
